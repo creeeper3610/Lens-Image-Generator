@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>個人用 Lens 画像生成</title>
+    <style>
+        body { font-family: sans-serif; max-width: 600px; margin: 40px auto; padding: 0 20px; text-align: center; }
+        input { width: 80%; padding: 10px; margin-bottom: 10px; font-size: 16px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        #resultContainer { margin-top: 20px; }
+        img { max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        #status { color: #666; margin-top: 10px; }
+    </style>
+</head>
+<body>
+
+    <h2>Microsoft Lens 生成テスト</h2>
+    
+    <input type="text" id="promptInput" value="A cute cat in a cyberpunk city" placeholder="英語でプロンプトを入力...">
+    <br>
+    <button id="generateBtn">画像を生成する</button>
+    
+    <div id="status"></div>
+    <div id="resultContainer"></div>
+
+    <!-- Gradio Client をブラウザに直接読み込むスクリプト -->
+    <script type="module">
+        import { Client } from "https://jsdelivr.net";
+
+        const promptInput = document.getElementById('promptInput');
+        const generateBtn = document.getElementById('generateBtn');
+        const statusDiv = document.getElementById('status');
+        const resultContainer = document.getElementById('resultContainer');
+
+        generateBtn.addEventListener('click', async () => {
+            const prompt = promptInput.value.trim();
+            if (!prompt) return alert('プロンプトを入力してください');
+
+            // 画面をローディング状態にする
+            generateBtn.disabled = true;
+            statusDiv.innerText = "Hugging Faceに接続中（数秒〜数十秒かかります）...";
+            resultContainer.innerHTML = "";
+
+            try {
+                // 1. スペースへ接続
+                const client = await Client.connect("multimodalart/lens");
+                
+                // 2. 提示されたオブジェクト形式でAPIを実行
+                const result = await client.predict("/generate", {
+                    prompt: prompt,
+                    model_name: "Lens-Turbo (4 steps)",
+                    base_resolution: "1024",
+                    aspect_ratio: "1:1",
+                    steps: 4,
+                    cfg: 1.0,
+                    seed: 0,
+                    randomize_seed: true,
+                });
+
+                // 3. 結果の取得と表示
+                // Gradioの画像データ（result.data[0]）には一時的なURLオブジェクトが含まれています
+                if (result.data && result.data[0]) {
+                    const imageData = result.data[0];
+                    const imageUrl = imageData.url; // 画像のURLを取り出す
+
+                    const img = document.createElement('img');
+                    img.src = imageUrl;
+                    resultContainer.appendChild(img);
+                    statusDiv.innerText = "生成完了！";
+                } else {
+                    statusDiv.innerText = "エラー: データが返ってきませんでした。";
+                }
+
+            } catch (error) {
+                console.error(error);
+                statusDiv.innerText = "エラーが発生しました。混雑している可能性があります。";
+            } finally {
+                generateBtn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>
