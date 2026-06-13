@@ -11,7 +11,7 @@
         button:disabled { opacity: 0.5; cursor: not-allowed; }
         #resultContainer { margin-top: 20px; }
         img { max-width: 100%; border-radius: 8px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
-        #status { color: #666; margin-top: 10px; }
+        #status { color: #666; margin-top: 10px; white-space: pre-wrap; }
     </style>
 </head>
 <body>
@@ -25,9 +25,9 @@
     <div id="status"></div>
     <div id="resultContainer"></div>
 
-    <!-- Gradio Client をブラウザに直接読み込むスクリプト -->
+    <!-- 接続エラー対策のため esm.sh からライブラリを読み込み -->
     <script type="module">
-        import { Client } from "https://jsdelivr.net";
+        import { Client } from "https://esm.sh";
 
         const promptInput = document.getElementById('promptInput');
         const generateBtn = document.getElementById('generateBtn');
@@ -38,7 +38,6 @@
             const prompt = promptInput.value.trim();
             if (!prompt) return alert('プロンプトを入力してください');
 
-            // 画面をローディング状態にする
             generateBtn.disabled = true;
             statusDiv.innerText = "Hugging Faceに接続中（数秒〜数十秒かかります）...";
             resultContainer.innerHTML = "";
@@ -47,7 +46,9 @@
                 // 1. スペースへ接続
                 const client = await Client.connect("multimodalart/lens");
                 
-                // 2. 提示されたオブジェクト形式でAPIを実行
+                statusDiv.innerText = "画像を生成中...";
+
+                // 2. 指定されたパラメータでAPIを実行
                 const result = await client.predict("/generate", {
                     prompt: prompt,
                     model_name: "Lens-Turbo (4 steps)",
@@ -59,23 +60,26 @@
                     randomize_seed: true,
                 });
 
-                // 3. 結果の取得と表示
-                // Gradioの画像データ（result.data[0]）には一時的なURLオブジェクトが含まれています
-                if (result.data && result.data[0]) {
+                // 3. 配列データから画像のURLを正しく抽出
+                if (result && result.data && result.data.length > 0) {
                     const imageData = result.data[0];
-                    const imageUrl = imageData.url; // 画像のURLを取り出す
+                    const imageUrl = imageData.url;
 
-                    const img = document.createElement('img');
-                    img.src = imageUrl;
-                    resultContainer.appendChild(img);
-                    statusDiv.innerText = "生成完了！";
+                    if (imageUrl) {
+                        const img = document.createElement('img');
+                        img.src = imageUrl;
+                        resultContainer.appendChild(img);
+                        statusDiv.innerText = "生成完了！";
+                    } else {
+                        statusDiv.innerText = "エラー: 画像URLが見つかりませんでした。";
+                    }
                 } else {
                     statusDiv.innerText = "エラー: データが返ってきませんでした。";
                 }
 
             } catch (error) {
                 console.error(error);
-                statusDiv.innerText = "エラーが発生しました。混雑している可能性があります。";
+                statusDiv.innerText = "エラーが発生しました。\n" + error.message;
             } finally {
                 generateBtn.disabled = false;
             }
